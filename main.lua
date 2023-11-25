@@ -366,11 +366,9 @@ local function do_job(index)
 	local job = joblist[index]
 	cp("Processing job " .. job.directory)
 	
-	local prerun_data = "lib.log_error('" .. job.id .. " v" .. job.version .. " was patched with NeoPatcher!')\n\nlib.set_waiting('" .. job.id .. "', '" .. job.version .. "', 'YES', 'NeoPatcher2')\n\nRegisterEvent(function() lib.set_waiting('" .. job.id .. "', '" .. job.version .. "', 'NO', 'NeoPatcher2') end, 'PLUGINS_LOADED')"
+	local ini_data = "[modreg]\ntype=patched\nid=" .. job.id .. "\nversion=" .. job.version .. "\nname=" .. job.name .. "\nauthor=" .. job.author
 	
-	local ini_data = "[modreg]\ntype=patched\nid=" .. job.id .. "\nversion=" .. job.version .. "\nname=" .. job.name .. "\nauthor=" .. job.author .. "\npath=" .. job.path .. "\n\n[dependency]\nnum_dependents=0\ndepid1=\ndepvs1=\n"
-	
-	local main_data = "if type(lib) == 'table' and lib[0] == 'LME' then\n	if not lib.is_exist('" .. job.id .. "', '" .. job.version .. "') then\n		lib.register('plugins/" .. job.original_root .. "/registration.ini')\n	end\n	\n	if lib.is_ready('" .. job.id .. "', '" .. job.version .. "') then\n		lib.resolve_file('plugins/" .. job.original_root .. "/core_patched.lua')\n	end\nelse\n	dofile('core_patched.lua')\nend"
+	local main_data = "local ini_path='plugins/" .. job.original_root .. "/registration.ini'" .. "\n\nif type(lib) == 'table' and lib[0] == 'LME' then\n	if not lib.is_exist(ini_path) then\n		lib.register(ini_path)\n	end\n	\n	if lib.is_ready(ini_path) then\n		lib.catch_block(ini_path, nil, function()\n			dofile(lib.find_file('plugins/" .. job.original_root .. "/core_patched.lua'))\n		end)\n	end\nelse\n	dofile('core_patched.lua')\nend"
 	
 	local function convert_folder_paths_back(instr)
 		return string.gsub(instr, "/", "\\")
@@ -448,11 +446,6 @@ local function do_job(index)
 	
 	save_file(ini_data, "registration.ini", job.directory)
 	--create new registration.ini
-	
-	cp("	creating prerun file", true)
-	
-	save_file(prerun_data, "prerun.lua", job.directory)
-	--create new prerun.lua
 	
 	return true
 end
@@ -1011,7 +1004,7 @@ end
 
 local function create_diag()
 	local diag = iup.dialog {
-		title = "NeoPatcher v2.0.0",
+		title = "NeoPatcher v2.1.0",
 		size = tostring(x_max + 10) .. "x" .. tostring(y_max + 10),
 		iup.vbox {
 			iup.frame {
