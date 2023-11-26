@@ -368,7 +368,7 @@ local function do_job(index)
 	
 	local ini_data = "[modreg]\ntype=patched\nid=" .. job.id .. "\nversion=" .. job.version .. "\nname=" .. job.name .. "\nauthor=" .. job.author
 	
-	local main_data = "local ini_path='plugins/" .. job.original_root .. "/registration.ini'" .. "\n\nif type(lib) == 'table' and lib[0] == 'LME' then\n	if not lib.is_exist(ini_path) then\n		lib.register(ini_path)\n	end\n	\n	if lib.is_ready(ini_path) then\n		lib.catch_block(ini_path, nil, function()\n			dofile(lib.find_file('plugins/" .. job.original_root .. "/core_patched.lua'))\n		end)\n	end\nelse\n	dofile('core_patched.lua')\nend"
+	local main_data = "local ini_path='plugins/" .. job.original_root .. "/registration.ini'" .. "\n\nif type(lib) == 'table' and lib[0] == 'LME' then\n	if not lib.is_exist(ini_path) then\n		lib.register(ini_path)\n	end\n	\n	if lib.is_ready(ini_path) then\n		lib.block_trap(ini_path, nil, function()\n			dofile(lib.find_file('plugins/" .. job.original_root .. "/core_patched.lua'))\n		end)\n	end\nelse\n	dofile('core_patched.lua')\nend"
 	
 	local function convert_folder_paths_back(instr)
 		return string.gsub(instr, "/", "\\")
