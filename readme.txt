@@ -1,26 +1,49 @@
-Welcome to NeoPatcher! The goal of NeoPatcher is to provide an easy way to translate ordinary plugins for Vendetta Online into ones compatible with Neoloader. NeoPatcher creates the registration and launcher files necessary for making Neoloader detect your plugin(s), while the plugin's code itself is handled by the game just like normal.
+Welcome to NeoPatcher!
 
-An executable is provided for Windows users. If you are on another PC system, please refer to readme-dev.txt.
+NeoPatcher is a tool that helps you convert ordinary plugins for Vendetta Online into ones compatible with Neoloader. It creates the registration and launcher code necessary for Neoloader to detect and manage your plugin(s), while the plugin itself continues to function just like it did before.
 
-==================================================
-Instructions on use:
-==================================================
-
-1) Launch NeoPatcher and agree to the MIT license. 
-2) Select to patch all mods, or patch a specific mod
-3a) If you want to patch ALL of your mods, select the folder containing all of your mods, then click next
-3b) If you want to patch a specific mod, select the folder containing that individual mod, then click next
-4) Select a mod you want to edit details on. The mods to be patched will be listed on the left; when one is selected, the contents on the right will fill in. Items will save edits you make when you select another mod or begin the process.
-4a) If you want to add more individual mods to patch, you can do so with the button on the bottom left at this time.
-5) Select to begin the patching process. If you have only one or a few mods to patch, this process will likely happen instantaniously.
-6) Congratulations, you're done, and your mods have been patched!
-
-If there are any issues with your patched mod, you can find the original mod's files located in the "backup" folder created where the tool is located. 
+A Windows executable is provided. If you're using a different operating system, see `readme-dev.txt` for source-based usage instructions.
 
 ==================================================
-How it works
+Instructions
 ==================================================
 
-How does NeoPatcher create its patches? Its actually really simple. It takes the original main.lua file and renames it to "core_patched.lua", then creates new main.lua file based on a template. It then creates a Neoloader declaration INI based on the provided information, and then its done! 
+1) Launch NeoPatcher and agree to the MIT license.
+2) Choose whether to patch:
+     • All of your mods at once, or
+     • A specific mod
 
-The end result is a plugin that registers itself to Neoloader. When the Neoloader init process occurs, it detects your newly patched code as a compatibility plugin, and then patched_core.lua will run during the default plugin loader like normal as long as the plugin is set to load. As a bonus, if Neoloader is not enabled, the plugin will skip all the neoloader stuff and just launch like normal anyways. 
+3a) If patching all mods:  
+     • Select the folder that contains your mod folders  
+     • Click "Next"
+
+3b) If patching a specific mod:  
+     • Select that mod's folder  
+     • Click "Next"
+
+4) On the job screen:  
+     • Select a mod from the list on the left  
+     • Its info will appear on the right  
+     • You can edit the plugin's internal name, version, etc.
+
+4a) You can add more individual mods to the list at this time by clicking the "Add another mod" button.
+
+5) When you're ready, click "Begin Patching" to apply the changes. For most mods, this takes less than a second.
+
+6) Done! Your selected mods are now Neoloader-compatible.
+
+If anything goes wrong, a complete backup of the original mod folder is created inside a `backup/` folder where the tool is located.
+
+==================================================
+How It Works
+==================================================
+
+NeoPatcher modifies your mod’s `main.lua` file using a template. This template adds:
+
+• Inline LME registration metadata (`[modreg]`, etc.)
+• Detection and compatibility code for Neoloader
+• A fallback so your plugin still loads correctly if Neoloader isn't present
+
+The patched plugin registers itself with Neoloader, and during the game’s normal plugin loading phase, your original plugin logic still runs as expected. The added code is minimal, and ensures compatibility without disrupting the original behavior.
+
+Best of all: if Neoloader isn’t installed, the plugin just runs like normal — no harm, no error, no disruption.
