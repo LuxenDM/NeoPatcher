@@ -254,7 +254,7 @@ local function convert_folder_paths(instr)
 	return string.gsub(instr, "\\", "/")
 end
 
-local fontsize = "12"
+local fontsize = "9"
 local function font(mod)
 	return "Arial, " .. tostring(tonumber(fontsize) + (mod or 0))
 end
@@ -365,38 +365,36 @@ end
 local function do_job(index)
 	local job = joblist[index]
 	cp("Processing job " .. job.directory)
-	
-	local ini_data = "[modreg]\ntype=patched\nid=" .. job.id .. "\nversion=" .. job.version .. "\nname=" .. job.name .. "\nauthor=" .. job.author
-	
-	local main_data = "local ini_path='plugins/" .. job.original_root .. "/registration.ini'" .. "\n\nif type(lib) == 'table' and lib[0] == 'LME' then\n	if not lib.is_exist(ini_path) then\n		lib.register(ini_path)\n	end\n	\n	if lib.is_ready(ini_path) then\n		lib.block_trap(ini_path, nil, function()\n			lib.resolve_file('plugins/" .. job.original_root .. "/core_patched.lua')\n		end)\n	end\nelse\n	dofile('core_patched.lua')\nend"
-	
+
 	local function convert_folder_paths_back(instr)
 		return string.gsub(instr, "/", "\\")
 	end
-	
+
 	local function save_file(text, name, dir)
 		dir = convert_folder_paths_back(dir)
 		name = convert_folder_paths_back(name)
 		local path = dir .. "\\" .. name
-		
+
 		cp("	svproc <text> to " .. path, true)
-		
-		local file = io.open(path, "w")
+
+		local file, err = io.open(path, "w")
 		if file then
 			file:write(text)
 			file:close()
+			return true
 		else
-			cp("Error writing file " .. name)
+			cp("Error writing file " .. name .. ": " .. tostring(err), true)
 			return false
 		end
 	end
-	
+
+
 	local function copy_file(name, source, dir, dest)
 		local read_path = dir .. "\\" .. source
 		if not dest then dest = dir end
-		
+
 		cp("	cpproc " .. name .. " from " .. read_path .. " to " .. dest, true)
-		
+
 		local read_file = io.open(read_path, "r")
 		if not read_file then
 			cp("Error reading file " .. source)
@@ -404,17 +402,15 @@ local function do_job(index)
 		end
 		local read_content = read_file:read("*all")
 		read_file:close()
-		
-		save_file(read_content, name, dest)
+
+		return save_file(read_content, name, dest)
 	end
-	
-	
-	
+
 	local function backup_dir(source_dir, destination_dir)
 		cp("	making directory " .. patcher_dir .. "\\backup\\" .. destination_dir, true)
 		lfs.mkdir(patcher_dir .. "\\backup")
 		lfs.mkdir(patcher_dir .. "\\backup\\" .. destination_dir)
-		
+
 		for entry in lfs.dir(source_dir) do
 			local attr = lfs.attributes(source_dir .. "\\" .. entry, "mode")
 			if entry ~= "." and entry ~= ".." then
@@ -427,37 +423,105 @@ local function do_job(index)
 			end
 		end
 	end
-	
+
 	cp("	backing up original mod...", true)
-	--do backup
-	
 	backup_dir(job.directory, job.original_root)
+
+	cp("	reading original main.lua...", true)
+	local main_path = job.directory .. "\\main.lua"
+	local file = io.open(main_path, "r")
+	if not file then
+		cp("	Failed to open original main.lua", true)
+		return false
+	end
+	local original_code = file:read("*all")
+	file:close()
+
+	cp("	generating new main.lua...", true)
+
+	local ini_header = "--[[\n"
+		.. "[modreg]\n"
+		.. "API=3\n"
+		.. "id=" .. job.id .. "\n"
+		.. "version=" .. job.version .. "\n"
+		.. "name=" .. job.name .. "\n"
+		.. "author=" .. job.author .. "\n"
+		.. "\n[metadata]\n"
+		.. "description=This plugin was patched with Neopatcher\n"
+		.. "]]--\n\n"
+
+	local registration_logic = ([[
+if (type(lib) == "table") and (lib[0] == "LME") then
+
+	local my_path
 	
-	cp("	mirroring main to core_patched.lua", true)
-	
-	copy_file("core_patched.lua", "main.lua", job.directory .. "/")
-	
-	cp("	creating new main.lua", true)
-	
-	save_file(main_data, "main.lua", job.directory)
-	--create new main.lua
-	
-	cp("	creating new registration file", true)
-	
-	save_file(ini_data, "registration.ini", job.directory)
-	--create new registration.ini
-	
+	if not lib.get_path then
+		--LME API is v3.11.0 or earlier
+		my_path = "plugins/%s/"
+	else
+		--LME API is v3.12.0+
+		my_path = lib.get_path() or "plugins/%s/"
+	end
+
+	if not lib.is_exist(my_path .. "main.lua") then
+		lib.register(my_path .. "main.lua")
+	end
+
+	if lib.get_state(my_path .. "main.lua").load == "NO" then
+		--plugin is set as disabled by user
+		return
+	end
+
+	local class = {
+		CCD1 = true,
+		description = "This plugin was patched with Neopatcher",
+	}
+
+	lib.set_class(my_path .. "main.lua", nil, class)
+end
+
+]]):format(job.original_root, job.original_root)
+
+	local final_code = ini_header .. registration_logic .. "\n" .. original_code
+	local saved = save_file(final_code, "main.lua", job.directory)
+	if not saved then
+		cp("	Failed to write new main.lua", true)
+		return false
+	end
+
+	cp("	patch complete!", true)
 	return true
+end
+
+
+local function folder_has_modreg(path)
+	for file in lfs.dir(path) do
+		local fullpath = path .. "/" .. file
+		local attr = lfs.attributes(fullpath)
+		if attr and attr.mode == "file" then
+			local f = io.open(fullpath, "r")
+			if f then
+				local contents = f:read("*a")
+				f:close()
+				if contents:find("%[modreg%]") then
+					return true, file
+				end
+			end
+		end
+	end
+	return false
 end
 
 local function addjobfolder(root_dir)
 	for child in lfs.dir(root_dir) do
-		if lfs.attributes(root_dir .. "/" .. child, "mode") == "directory" then
-			if lfs.attributes(root_dir .. "/" .. child .. "/main.lua", "mode") == "file" then
-				if not wildcard_exists(root_dir .. "/" .. child, "ini") then
-					addjob(root_dir .. "/" .. child)
+		local plugin_path = root_dir .. "/" .. child
+		if lfs.attributes(plugin_path, "mode") == "directory" then
+			if lfs.attributes(plugin_path .. "/main.lua", "mode") == "file" then
+				local has_reg, file = folder_has_modreg(plugin_path)
+				if has_reg then
+					cp("skipping " .. child .. "; mod registration found in " .. file)
 				else
-					cp("skipping " .. child .. "; appears to be compatible already")
+					addjob(plugin_path)
 				end
 			else
 				cp("skipping " .. child .. "; does not appear to be a plugin (no main.lua)")
@@ -467,6 +531,7 @@ local function addjobfolder(root_dir)
 		end
 	end
 end
+
 
 
 
@@ -1004,7 +1069,7 @@ end
 
 local function create_diag()
 	local diag = iup.dialog {
-		title = "NeoPatcher v2.1.1",
+		title = "NeoPatcher v2.2.0",
 		size = tostring(x_max + 10) .. "x" .. tostring(y_max + 10),
 		iup.vbox {
 			iup.frame {
